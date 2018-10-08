@@ -1,15 +1,11 @@
 package stopbot
 
-import java.util.regex.{MatchResult, Pattern}
-
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.functions.from_json
-import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.functions.regexp_extract
-import org.apache.spark.sql.functions.reverse
 
 
 //[{"unix_time": 1538076151, "category_id": 1009, "ip": "172.10.2.42", "type": "view"},
@@ -50,6 +46,7 @@ object FraudDetector {
       .option("subscribe", "ad-events")
       .option("key.deserializer", classOf[StringDeserializer].toString)
       .option("value.deserializer", classOf[StringDeserializer].toString)
+      .option("failOnDataLoss", value = false)
       .load()
 
     df.printSchema()
@@ -57,25 +54,31 @@ object FraudDetector {
 
     import spark.implicits._
 
-
-    val eventSchema = new StructType()
+    val eventSchema =  new StructType()
       .add("unix_time", LongType, nullable = false)
       .add("category_id", IntegerType, nullable = false)
       .add("ip", StringType, nullable = false)
       .add("type", StringType, nullable = false)
 
 
-//    var evPattern = """^\[?(\{.*\})[\,\]]?$"""
+//    val originalEvents = df.limit(10).select($"value".cast("string").as("json"))
 
-    val originalEvents = df.limit(10).select($"value".cast("string"))
+    val groomed = df.limit(10)
+      .select(translate($"value".cast(StringType), "\\", "").as("value"))
+      .select(regexp_extract($"value".cast(StringType), "(\\{.*\\})", 1).as("json"))
 
-    val events = df.limit(10)
-      .select(regexp_extract($"value".cast("string"), "(\\{.*\\})", 1).alias("value2"))
-//      .select(from_json($"value2", eventSchema)).as("struct")
+    val events = groomed
+      .select(from_json($"json".cast(StringType), schema = eventSchema).as("struct"))
+//      .select("struct.*")
 //      .map(r => Event(r.getLong(0), r.getInt(1), r.getString(2), r.getString(3)))
 
-
     events.count()
+
+
+
+
+
+
 
 //    val query = events.writeStream
 //      .format("console")
@@ -86,6 +89,16 @@ object FraudDetector {
 
 
 
+
+
+
+    //    val testDS = Seq("{\"unix_time\": 1538932022, \"category_id\": 1008, \"ip\": \"172.10.0.65\", \"type\": \"click\"}").toDS
+    //    val testParsed = testDS.select(from_json($"value", schema = eventSchema).as("struct"))//.select("struct.*")
+    //    testParsed.collect()
+
+    //    val dfExample = spark.sql(select "{\"unix_time\": 1538932022, \"category_id\": 1009, \"ip\": \"172.10.2.2\", \"type\": \"view\"}" as json""")
+    //    val dfICanWorkWith = dfExample.select(from_json($"json", eventSchema))
+    //    dfICanWorkWith.collect()
 
 
 
