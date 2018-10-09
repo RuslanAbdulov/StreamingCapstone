@@ -12,21 +12,6 @@ import org.apache.spark.sql.functions.regexp_extract
 //{"unix_time": 1538076151, "category_id": 1004, "ip": "172.10.1.139", "type": "click"},
 //val regex = "^\\[?(\\{.*\\})[\\,\\]]?$".r
 
-abstract class EventAbstract {
-  def unixTime: Long
-  def categoryId: Int
-  def ipAddress: String
-  def eventType: String
-}
-
-case class Click(unixTime: Long, categoryId: Int, ipAddress: String, eventType: String) extends EventAbstract
-case class View(unixTime: Long, categoryId: Int, ipAddress: String, eventType: String) extends EventAbstract
-
-case class Event(unixTime: Long, categoryId: Int, ipAddress: String, eventType: String) {
-  def isClick: Boolean = eventType == "click"
-  def isView: Boolean = eventType == "view"
-}
-
 object FraudDetector {
 
   def main(args: Array[String]) {
@@ -60,17 +45,17 @@ object FraudDetector {
       .add("ip", StringType, nullable = false)
       .add("type", StringType, nullable = false)
 
-
-//    val originalEvents = df.limit(10).select($"value".cast("string").as("json"))
-
-    val groomed = df.limit(10)
+    val groomedJson = df
       .select(translate($"value".cast(StringType), "\\", "").as("value"))
       .select(regexp_extract($"value".cast(StringType), "(\\{.*\\})", 1).as("json"))
 
-    val events = groomed
+    val events = groomedJson
       .select(from_json($"json".cast(StringType), schema = eventSchema).as("struct"))
-//      .select("struct.*")
-//      .map(r => Event(r.getLong(0), r.getInt(1), r.getString(2), r.getString(3)))
+      .na.drop()
+      .select($"struct.*")
+      .toDF("unixTime", "categoryId", "ipAddress", "eventType")
+      .as[Event]
+
 
     events.count()
 
@@ -122,10 +107,13 @@ object FraudDetector {
 //    )
 
 
-//    stream.map(record => (record.key, record.value))
 
 
-
+    //TODO log corrupt records
+    //    if(financesDS.hasColumn("_corrupt_record")) {
+    //	    financesDS.where($"_corrupt_record".isNotNull).select($"_corrupt_record")
+    //	              .write.mode(SaveMode.Overwrite).text("Output/corrupt_finances")
+    //    }
   }
 
 
