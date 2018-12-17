@@ -12,7 +12,7 @@ import org.apache.spark.sql.functions.regexp_extract
 //{"unix_time": 1538076151, "category_id": 1004, "ip": "172.10.1.139", "type": "click"},
 //val regex = "^\\[?(\\{.*\\})[\\,\\]]?$".r
 
-object FraudDetector {
+object FraudDetector2 {
 
   def main(args: Array[String]) {
 
