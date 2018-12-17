@@ -21,7 +21,7 @@ object FraudDetectoSourceFile {
 
 
     val df = spark
-//      .readStream
+      //      .readStream
       .read
       .text("Data/ad-events.json")
 
@@ -30,55 +30,62 @@ object FraudDetectoSourceFile {
 
     import spark.implicits._
 
-    val eventSchema =  new StructType()
+    val eventSchema = new StructType()
       .add("unix_time", LongType, nullable = false)
       .add("category_id", IntegerType, nullable = false)
       .add("ip", StringType, nullable = false)
       .add("type", StringType, nullable = false)
 
 
-//    df.take(5).foreach(r => println(r))
-
     val groomedJson = df
       .select(translate($"value".cast(StringType), "\\", "").as("value"))
       .select(regexp_extract($"value".cast(StringType), "(\\{.*\\})", 1).as("json"))
-
-    groomedJson.foreach(r => println(r))
-    groomedJson.printSchema()
 
     val events = groomedJson
       .select(from_json($"json".cast(StringType), schema = eventSchema).as("struct"))
       .na.drop()
       .select($"struct.*")
       .toDF("unixTime", "categoryId", "ipAddress", "eventType")
-//      .as[Event]
+    //      .as[Event]
 
-//    val groupedByIp = events.groupByKey(ev => ev.ipAddress)
-
-    events.show(5)
+    val groupedByIp = events.groupBy($"ipAddress")
 
 
     //Enormous event rate, e.g. more than 1000 request in 10 minutes*.
-    val enormousRateDF = events.groupBy($"ipAddress")
-        .agg(count($"unixTime").as("amount"))
-        .filter($"amount" > 10)
+    val enormousAmountDF = groupedByIp
+      .agg(count($"unixTime").as("amount"))
+      .filter($"amount" > 10)
 
 
-    enormousRateDF.show()
+    //High difference between click and view events, e.g. (clicks/views) more than 3-5. Correctly process cases when there is no views.
+    val highDifferenceDF = groupedByIp
+      .agg((
+        count(when($"eventType" === "click", $"unixTime"))
+          / count(when($"eventType" === "view", $"unixTime"))).as("rate"))
+      .filter($"rate" > 3)
+
+
+    //Looking for many categories during the period, e.g. more than 5 categories in 10 minutes.
+    val enormousCategoriesDF = groupedByIp
+      .agg(countDistinct($"categoryId").as("categories"))
+      .filter($"categories" > 5)
+
+
+    enormousAmountDF.show()
+    highDifferenceDF.show()
+    enormousCategoriesDF.show()
 
 
 
 
+    //    val query = events.writeStream
+    //      .format("console")
+    //      .trigger(Trigger.ProcessingTime("2 seconds"))
+    //      .start()
+    //
+    //    query.awaitTermination()
 
 
-//    val query = events.writeStream
-//      .format("console")
-//      .trigger(Trigger.ProcessingTime("2 seconds"))
-//      .start()
-//
-//    query.awaitTermination()
-
-
-
+  }
 
 }
