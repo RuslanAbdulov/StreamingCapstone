@@ -2,6 +2,7 @@ package stopbot
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{regexp_extract, _}
+import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
 
 
@@ -21,17 +22,14 @@ object FraudDetectoSourceFile {
 
 
     val df = spark
-      //      .readStream
-      .read
-      .text("Data/ad-events.json")
-
-    df.printSchema()
+      .readStream
+      .text("Data/")
 
 
     import spark.implicits._
 
     val eventSchema = new StructType()
-      .add("unix_time", LongType, nullable = false)
+      .add("unix_time", TimestampType, nullable = false)
       .add("category_id", IntegerType, nullable = false)
       .add("ip", StringType, nullable = false)
       .add("type", StringType, nullable = false)
@@ -48,7 +46,11 @@ object FraudDetectoSourceFile {
       .toDF("unixTime", "categoryId", "ipAddress", "eventType")
     //      .as[Event]
 
-    val groupedByIp = events.groupBy($"ipAddress")
+    val groupedByIp = events
+      .withWatermark("unixTime", "1 minutes") //10 minutes
+      .groupBy(
+        window($"unixTime", "1 minutes", "30 seconds"), //10 minutes, 5 minutes
+        $"ipAddress")
 
 
     //Enormous event rate, e.g. more than 1000 request in 10 minutes*.
@@ -71,19 +73,28 @@ object FraudDetectoSourceFile {
       .filter($"categories" > 5)
 
 
-    enormousAmountDF.show()
-    highDifferenceDF.show()
-    enormousCategoriesDF.show()
+//    enormousAmountDF.show()
+    val query1 = enormousAmountDF.writeStream
+      .format("console")
+      .trigger(Trigger.ProcessingTime("20 seconds"))
+      .start()
+
+//    highDifferenceDF.show()
+    val query2 = highDifferenceDF.writeStream
+      .format("console")
+      .trigger(Trigger.ProcessingTime("20 seconds"))
+      .start()
+
+//    enormousCategoriesDF.show()
+    val query3 = enormousCategoriesDF.writeStream
+      .format("console")
+      .trigger(Trigger.ProcessingTime("20 seconds"))
+      .start()
 
 
-
-
-    //    val query = events.writeStream
-    //      .format("console")
-    //      .trigger(Trigger.ProcessingTime("2 seconds"))
-    //      .start()
-    //
-    //    query.awaitTermination()
+    query1.awaitTermination()
+    query2.awaitTermination()
+    query3.awaitTermination()
 
 
   }
