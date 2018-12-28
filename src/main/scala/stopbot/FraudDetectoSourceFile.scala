@@ -22,6 +22,7 @@ object FraudDetectoSourceFile {
 
 
     val df = spark
+//      .read
       .readStream
       .text("Data/")
 
@@ -47,9 +48,9 @@ object FraudDetectoSourceFile {
     //      .as[Event]
 
     val groupedByIp = events
-      .withWatermark("unixTime", "1 minutes") //10 minutes
+      .withWatermark("unixTime", "10 minutes") //10 minutes
       .groupBy(
-        window($"unixTime", "1 minutes", "30 seconds"), //10 minutes, 5 minutes
+        window($"unixTime", "10 minutes", "5 minutes"), //10 minutes, 5 minutes
         $"ipAddress")
 
 
@@ -69,24 +70,24 @@ object FraudDetectoSourceFile {
 
     //Looking for many categories during the period, e.g. more than 5 categories in 10 minutes.
     val enormousCategoriesDF = groupedByIp
-      .agg(countDistinct($"categoryId").as("categories"))
+      .agg(size(collect_set($"categoryId")).as("categories"))
       .filter($"categories" > 5)
 
 
-//    enormousAmountDF.show()
     val query1 = enormousAmountDF.writeStream
+      .outputMode("update")//append
       .format("console")
       .trigger(Trigger.ProcessingTime("20 seconds"))
       .start()
 
-//    highDifferenceDF.show()
     val query2 = highDifferenceDF.writeStream
+      .outputMode("update")//append
       .format("console")
       .trigger(Trigger.ProcessingTime("20 seconds"))
       .start()
 
-//    enormousCategoriesDF.show()
     val query3 = enormousCategoriesDF.writeStream
+      .outputMode("update")
       .format("console")
       .trigger(Trigger.ProcessingTime("20 seconds"))
       .start()
