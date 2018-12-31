@@ -10,12 +10,12 @@ import org.apache.spark.sql.types._
 //{"unix_time": 1538076151, "category_id": 1004, "ip": "172.10.1.139", "type": "click"},
 //val regex = "^\\[?(\\{.*\\})[\\,\\]]?$".r
 
-object FraudDetectoSourceFile {
+object FraudDetectorSourceFile {
 
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder
-      .master("local")
+      .master("local[5]")
       .appName("Fraud Detector")
       .config("spark.driver.memory", "2g")
       .getOrCreate()
