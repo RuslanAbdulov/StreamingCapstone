@@ -3964,7 +3964,7 @@
 {"unix_time": 1538932036, "category_id": 1007, "ip": "172.10.2.173", "type": "click"},
 {"unix_time": 1538932036, "category_id": 1005, "ip": "172.10.1.239", "type": "view"},
 {"unix_time": 1538932036, "category_id": 1004, "ip": "172.10.0.199", "type": "view"},
-{"unix_time": 1538932036, "category_id": 1007, "ip": "172.10.1.9", "type": "view"},
+{"unix_time": 1538932036, "category_id": 1007, "ip": "172.10.1.9", "type": "click"},
 {"unix_time": 1538932036, "category_id": 1001, "ip": "172.10.0.177", "type": "click"},
 {"unix_time": 1538932036, "category_id": 1009, "ip": "172.10.3.106", "type": "click"},
 {"unix_time": 1538932036, "category_id": 1007, "ip": "172.10.3.59", "type": "click"},
