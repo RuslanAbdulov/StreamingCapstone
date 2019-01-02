@@ -48,7 +48,7 @@ object FraudDetectorSourceFile {
     //      .as[Event]
 
     val groupedByIp = events
-      .withWatermark("unixTime", "10 minutes") //10 minutes
+      .withWatermark("unixTime", "1 minute") //10 minutes
       .groupBy(
         window($"unixTime", "10 minutes", "5 minutes"), //10 minutes, 5 minutes
         $"ipAddress")
