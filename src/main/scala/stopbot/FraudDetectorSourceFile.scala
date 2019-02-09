@@ -56,23 +56,13 @@ object FraudDetectorSourceFile {
 
     //Enormous event rate, e.g. more than 1000 request in 10 minutes*.
     val enormousAmountDF = groupedByIp
-      .agg(count($"unixTime").as("amount"))
-      .filter($"amount" > 10)
-
-
-    //High difference between click and view events, e.g. (clicks/views) more than 3-5. Correctly process cases when there is no views.
-    val highDifferenceDF = groupedByIp
-      .agg((
-        count(when($"eventType" === "click", $"unixTime"))
-          / count(when($"eventType" === "view", $"unixTime"))).as("rate"))
-      .filter($"rate" > 3)
-
-
-    //Looking for many categories during the period, e.g. more than 5 categories in 10 minutes.
-    val enormousCategoriesDF = groupedByIp
-      .agg(size(collect_set($"categoryId")).as("categories"))
-      .filter($"categories" > 5)
-
+      .agg(
+        count($"unixTime").as("amount"),
+        (count(when($"eventType" === "click", $"unixTime"))
+            / count(when($"eventType" === "view", $"unixTime"))).as("rate"),
+        size(collect_set($"categoryId")).as("categories")
+      )
+      .filter($"amount" > 10 || $"rate" > 3 || $"categories" > 5)//TODO set $"amount" > 1000
 
     val query1 = enormousAmountDF.writeStream
       .outputMode("update")//append
@@ -80,23 +70,7 @@ object FraudDetectorSourceFile {
       .trigger(Trigger.ProcessingTime("20 seconds"))
       .start()
 
-    val query2 = highDifferenceDF.writeStream
-      .outputMode("update")//append
-      .format("console")
-      .trigger(Trigger.ProcessingTime("20 seconds"))
-      .start()
-
-    val query3 = enormousCategoriesDF.writeStream
-      .outputMode("update")
-      .format("console")
-      .trigger(Trigger.ProcessingTime("20 seconds"))
-      .start()
-
-
     query1.awaitTermination()
-    query2.awaitTermination()
-    query3.awaitTermination()
-
 
   }
 
