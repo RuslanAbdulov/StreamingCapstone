@@ -27,7 +27,7 @@ object FraudDetectorSourceFile {
 
 
     val df = spark
-//      .read
+      //      .read
       .readStream
       .text("Data/")
 
@@ -55,8 +55,8 @@ object FraudDetectorSourceFile {
     val groupedByIp = events
       .withWatermark("unixTime", "1 minute") //10 minutes
       .groupBy(
-        window($"unixTime", "10 minutes", "5 minutes"), //10 minutes, 5 minutes
-        $"ipAddress")
+      window($"unixTime", "10 minutes", "5 minutes"), //10 minutes, 5 minutes
+      $"ipAddress")
 
 
     //Enormous event rate, e.g. more than 1000 request in 10 minutes*.
@@ -64,15 +64,17 @@ object FraudDetectorSourceFile {
       .agg(
         count($"unixTime").as("amount"),
         (count(when($"eventType" === "click", $"unixTime"))
-            / count(when($"eventType" === "view", $"unixTime"))).as("rate"),
+          / count(when($"eventType" === "view", $"unixTime"))).as("rate"),
         size(collect_set($"categoryId")).as("categories")
       )
-      .filter($"amount" > 10 || $"rate" > 3 || $"categories" > 5)//TODO set $"amount" > 1000
+      .filter($"amount" > 10 || $"rate" > 3 || $"categories" > 5) //TODO set $"amount" > 1000
 
-      enormousAmountDF.writeStream
+    enormousAmountDF
+      .writeStream
       .outputMode("update") //TODO append?
-      .format("spotbot.IgniteSourceProvider")
-      .foreach(igniteForeach).start().awaitTermination();
+      .foreach(igniteForeach)
+      .start()
+      .awaitTermination()
 
   }
 
