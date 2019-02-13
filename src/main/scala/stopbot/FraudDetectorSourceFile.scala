@@ -1,7 +1,10 @@
 package stopbot
 
+import org.apache.ignite.configuration.IgniteConfiguration
+import org.apache.ignite.spark.IgniteDataFrameSettings
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{regexp_extract, _}
+import org.apache.spark.sql.ignite.IgniteSparkSession
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
 
@@ -11,6 +14,8 @@ import org.apache.spark.sql.types._
 //val regex = "^\\[?(\\{.*\\})[\\,\\]]?$".r
 
 object FraudDetectorSourceFile {
+
+  val igniteForeach = new IgniteSinkForeach()
 
   def main(args: Array[String]) {
 
@@ -64,13 +69,10 @@ object FraudDetectorSourceFile {
       )
       .filter($"amount" > 10 || $"rate" > 3 || $"categories" > 5)//TODO set $"amount" > 1000
 
-    val query1 = enormousAmountDF.writeStream
-      .outputMode("update")//append
-      .format("console")
-      .trigger(Trigger.ProcessingTime("20 seconds"))
-      .start()
-
-    query1.awaitTermination()
+      enormousAmountDF.writeStream
+      .outputMode("update") //TODO append?
+      .format("spotbot.IgniteSourceProvider")
+      .foreach(igniteForeach).start().awaitTermination();
 
   }
 
