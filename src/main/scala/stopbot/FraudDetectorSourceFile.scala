@@ -1,13 +1,9 @@
 package stopbot
 
-import org.apache.ignite.configuration.IgniteConfiguration
 import org.apache.ignite.spark.IgniteDataFrameSettings
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions.{regexp_extract, _}
-import org.apache.spark.sql.ignite.IgniteSparkSession
-import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
-import sink.IgniteForeachWriter
 
 
 //[{"unix_time": 1538076151, "category_id": 1009, "ip": "172.10.2.42", "type": "view"},
@@ -66,12 +62,20 @@ object FraudDetectorSourceFile {
       )
       .filter($"amount" > 10 || $"rate" > 3 || $"categories" > 5) //TODO set $"amount" > 1000
 
-    val igniteForeach = new IgniteForeachWriter(spark.sparkContext)
-
     enormousAmountDF
       .writeStream
       .outputMode("update") //TODO append?
-      .foreach(igniteForeach)
+      .foreachBatch((batchDF: Dataset[Row], batchId: Long) =>
+      batchDF
+        .select("ipAddress", "window.end")
+          .write
+          .format(IgniteDataFrameSettings.FORMAT_IGNITE)
+          .option(IgniteDataFrameSettings.OPTION_CONFIG_FILE, "ignite-client-config.xml")
+          .option(IgniteDataFrameSettings.OPTION_TABLE, "bots")
+          .option(IgniteDataFrameSettings.OPTION_CREATE_TABLE_PRIMARY_KEY_FIELDS, "ipAddress")
+          .option(IgniteDataFrameSettings.OPTION_CREATE_TABLE_PARAMETERS, "template=replicated")
+          .mode("append")
+          .save())
       .start()
       .awaitTermination()
 
