@@ -24,8 +24,8 @@ object FraudDetector2 {
 
 
     val df = spark
-//      .readStream
-      .read
+      .readStream
+//      .read
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
       .option("subscribe", "ad-events")
@@ -33,8 +33,6 @@ object FraudDetector2 {
       .option("value.deserializer", classOf[StringDeserializer].toString)
       .option("failOnDataLoss", value = false)
       .load()
-
-    df.printSchema()
 
 
     import spark.implicits._
@@ -54,10 +52,9 @@ object FraudDetector2 {
       .na.drop()
       .select($"struct.*")
       .toDF("unixTime", "categoryId", "ipAddress", "eventType")
-      .as[Event]
 
 
-    events.count()
+
 
 
 

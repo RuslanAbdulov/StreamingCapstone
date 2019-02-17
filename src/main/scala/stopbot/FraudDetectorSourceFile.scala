@@ -7,6 +7,7 @@ import org.apache.spark.sql.functions.{regexp_extract, _}
 import org.apache.spark.sql.ignite.IgniteSparkSession
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
+import sink.IgniteForeachWriter
 
 
 //[{"unix_time": 1538076151, "category_id": 1009, "ip": "172.10.2.42", "type": "view"},
@@ -14,8 +15,6 @@ import org.apache.spark.sql.types._
 //val regex = "^\\[?(\\{.*\\})[\\,\\]]?$".r
 
 object FraudDetectorSourceFile {
-
-  val igniteForeach = new IgniteSinkForeach()
 
   def main(args: Array[String]) {
 
@@ -25,9 +24,7 @@ object FraudDetectorSourceFile {
       .config("spark.driver.memory", "2g")
       .getOrCreate()
 
-
     val df = spark
-      //      .read
       .readStream
       .text("Data/")
 
@@ -55,8 +52,8 @@ object FraudDetectorSourceFile {
     val groupedByIp = events
       .withWatermark("unixTime", "1 minute") //10 minutes
       .groupBy(
-      window($"unixTime", "10 minutes", "5 minutes"), //10 minutes, 5 minutes
-      $"ipAddress")
+        window($"unixTime", "10 minutes", "5 minutes"),
+        $"ipAddress")
 
 
     //Enormous event rate, e.g. more than 1000 request in 10 minutes*.
@@ -68,6 +65,8 @@ object FraudDetectorSourceFile {
         size(collect_set($"categoryId")).as("categories")
       )
       .filter($"amount" > 10 || $"rate" > 3 || $"categories" > 5) //TODO set $"amount" > 1000
+
+    val igniteForeach = new IgniteForeachWriter(spark.sparkContext)
 
     enormousAmountDF
       .writeStream

@@ -23,12 +23,17 @@ services:
     #   - kafka-cluster
     environment:
     - IGNITE_QUIET=false
+#    - CONFIG_URI=/capstone/ignite/config/ignite-cluster-config.xml
     ports:
     - 11211:11211
     - 47100:47100
-    - 47500:47500
+    - 47500-47509:47500-47509
     - 49112:49112
     - 10800:10800
+    volumes:
+    - ~/IdeaProjects/SparkStreaming/config:/capstone/ignite/config
+
+
 
   cassandra:
     hostname: cassandra-1
