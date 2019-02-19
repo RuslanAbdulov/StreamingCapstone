@@ -12,6 +12,8 @@ import org.apache.spark.sql.types._
 
 object FraudDetectorSourceFile {
 
+  val IGNITE_CONFIG = "ignite-client-config.xml"
+
   def main(args: Array[String]) {
 
     val spark = SparkSession.builder
@@ -43,7 +45,6 @@ object FraudDetectorSourceFile {
       .na.drop()
       .select($"struct.*")
       .toDF("unixTime", "categoryId", "ipAddress", "eventType")
-    //      .as[Event]
 
     val groupedByIp = events
       .withWatermark("unixTime", "1 minute") //10 minutes
@@ -70,7 +71,7 @@ object FraudDetectorSourceFile {
         .select("ipAddress", "window.end")
           .write
           .format(IgniteDataFrameSettings.FORMAT_IGNITE)
-          .option(IgniteDataFrameSettings.OPTION_CONFIG_FILE, "ignite-client-config.xml")
+          .option(IgniteDataFrameSettings.OPTION_CONFIG_FILE, IGNITE_CONFIG)
           .option(IgniteDataFrameSettings.OPTION_TABLE, "bots")
           .option(IgniteDataFrameSettings.OPTION_CREATE_TABLE_PRIMARY_KEY_FIELDS, "ipAddress")
           .option(IgniteDataFrameSettings.OPTION_CREATE_TABLE_PARAMETERS, "template=replicated")

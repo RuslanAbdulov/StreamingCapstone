@@ -34,8 +34,21 @@
             <list>
                 <bean class="org.apache.ignite.configuration.CacheConfiguration">
                     <property name="name" value="bots"/>
-                    <property name="cacheMode" value="PARTITIONED"/>
+                    <property name="cacheMode" value="REPLICATED"/>
                     <property name="atomicityMode" value="ATOMIC"/>
+
+                    <property name="expiryPolicyFactory">
+                        <bean class="javax.cache.expiry.CreatedExpiryPolicy" factory-method="factoryOf">
+                            <constructor-arg>
+                                <bean class="javax.cache.expiry.Duration">
+                                    <constructor-arg value="HOURS"/>
+                                    <constructor-arg value="24"/>
+                                </bean>
+                            </constructor-arg>
+                        </bean>
+                    </property>
+                    <property name="eagerTtl" value="false"/>
+
                 </bean>
             </list>
         </property>
