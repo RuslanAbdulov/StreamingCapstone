@@ -42,8 +42,6 @@ object FraudDetectorIgniteTableLookUp {
       .load()
     botsIgniteDF.createOrReplaceTempView("bots")
 
-    botsIgniteDF.show()
-
 
 
 
@@ -69,7 +67,6 @@ object FraudDetectorIgniteTableLookUp {
 
     //Filter using Ignite table
     events.createGlobalTempView("events")
-    spark.sql("select ")
 
     val events2 = events.join(
       botsIgniteDF.select($"ipAddress".as("cachedIp")), //$"ipAddress" === $"cachedIp", "left_anti")
@@ -98,6 +95,7 @@ object FraudDetectorIgniteTableLookUp {
     enormousAmountDF
       .writeStream
       .outputMode("update") //TODO append?
+//      .format("foreachBatch")
       .foreachBatch((batchDF: Dataset[Row], batchId: Long) =>
       batchDF
         .select("ipAddress", "window.end")
