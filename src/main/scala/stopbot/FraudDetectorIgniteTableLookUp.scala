@@ -19,16 +19,6 @@ object FraudDetectorIgniteTableLookUp {
       .config("spark.driver.memory", "2g")
       .getOrCreate()
 
-//    val ignite = Ignition.start(CONFIG)
-
-//    val igniteSession = IgniteSparkSession.builder()
-//      .appName("Spark Ignite catalog example")
-//      .master("local[5]")
-//      .config("spark.driver.memory", "2g")
-//      .config("spark.executor.instances", "2")
-//      .igniteConfig(IGNITE_CONFIG)
-
-
     val df = spark
       .readStream
       .text("Data/")
@@ -41,8 +31,6 @@ object FraudDetectorIgniteTableLookUp {
       .option(IgniteDataFrameSettings.OPTION_CONFIG_FILE, IGNITE_CONFIG)
       .load()
     botsIgniteDF.createOrReplaceTempView("bots")
-
-
 
 
     import spark.implicits._
@@ -69,10 +57,7 @@ object FraudDetectorIgniteTableLookUp {
     events.createGlobalTempView("events")
 
     val events2 = events.join(
-      botsIgniteDF.select($"ipAddress".as("cachedIp")), //$"ipAddress" === $"cachedIp", "left_anti")
-      $"ipAddress" === $"cachedIp", "left_outer")
-//      .drop(botsIgniteDF("cachedIp"))
-//      .drop(botsIgniteDF("end"))
+      botsIgniteDF.select($"ipAddress".as("cachedIp")), $"ipAddress" === $"cachedIp", "left_anti")
 
 
     val groupedByIp = events2
@@ -95,7 +80,6 @@ object FraudDetectorIgniteTableLookUp {
     enormousAmountDF
       .writeStream
       .outputMode("update") //TODO append?
-//      .format("foreachBatch")
       .foreachBatch((batchDF: Dataset[Row], batchId: Long) =>
       batchDF
         .select("ipAddress", "window.end")
