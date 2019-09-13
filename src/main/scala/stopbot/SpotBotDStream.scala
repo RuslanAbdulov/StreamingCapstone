@@ -88,6 +88,17 @@ object SpotBotDStream {
       .transform(rdd => rdd.map(aggregatedByIpEvent => (aggregatedByIpEvent._2.size > 10, aggregatedByIpEvent._2)))
       .foreachRDD(rdd => {
         rdd
+          .map(events => {//not mapping but saving to database
+            val session = cassandra.openSession()
+            val insert = session.prepare(s"""insert into $namespace.$table
+              ($column_ip, $column_categoryId, $column_unixTime, $column_eventType, $column_is_bot )
+              values (?, ?, ?, ?, ?)""")
+            val isBot = events._1
+            events._2.toStream.foreach(event =>
+              session.execute(
+                insert.bind(event.ip, event.category_id.toString, event.unix_time.toString, event.`type`, isBot.toString)))
+            events
+          })
           .filter(_._1) //write only bots
           .map(_._2)
           .flatMap(_.toStream)
@@ -99,17 +110,6 @@ object SpotBotDStream {
               println(event + " added to cache")
           })
 
-        rdd
-          .foreach(events => {
-            val session = cassandra.openSession()
-            val isBot = events._1
-            events._2.toStream.foreach(event =>
-              session.execute(
-                s"""insert into $namespace.$table
-              ($column_ip, $column_categoryId, $column_unixTime, $column_eventType, $column_is_bot )
-              values (?, ?, ?, ?, ?)""",
-                event.ip, event.category_id.toString, event.unix_time.toString, event.`type`, isBot.toString))
-          })
       })
 
 
