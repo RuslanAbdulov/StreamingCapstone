@@ -1,16 +1,9 @@
-package stopbot
+package tmp
 
 import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.functions.regexp_extract
-
-
-//[{"unix_time": 1538076151, "category_id": 1009, "ip": "172.10.2.42", "type": "view"},
-//{"unix_time": 1538076151, "category_id": 1004, "ip": "172.10.1.139", "type": "click"},
-//val regex = "^\\[?(\\{.*\\})[\\,\\]]?$".r
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{from_json, regexp_extract, translate}
+import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructType}
 
 object FraudDetector2 {
 
@@ -113,5 +106,12 @@ object FraudDetector2 {
     //    }
   }
 
+//  val filteredEvents = events
+//    .filter(column => {
+//      val cache: IgniteCache[String, String] = igniteContext.ignite().getOrCreateCache("bots")
+//      val result = !cache.containsKey(column.ipAddress)
+//      println(result)
+//      result
+//    })
 
 }

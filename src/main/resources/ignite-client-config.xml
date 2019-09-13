@@ -7,6 +7,9 @@
     <bean id="ignite.cfg" class="org.apache.ignite.configuration.IgniteConfiguration">
         <property name="gridName" value="testGrid-client"/>
         <property name="clientMode" value="true"/>
+        <!--<property name="failureHandler">-->
+            <!--<bean class="org.apache.ignite.failure.StopNodeFailureHandler"/>-->
+        <!--</property>-->
 
         <property name="discoverySpi">
             <bean class="org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi">
@@ -36,19 +39,17 @@
                     <property name="name" value="bots"/>
                     <property name="cacheMode" value="REPLICATED"/>
                     <property name="atomicityMode" value="ATOMIC"/>
-
                     <property name="expiryPolicyFactory">
                         <bean class="javax.cache.expiry.CreatedExpiryPolicy" factory-method="factoryOf">
                             <constructor-arg>
                                 <bean class="javax.cache.expiry.Duration">
-                                    <constructor-arg value="HOURS"/>
-                                    <constructor-arg value="24"/>
+                                    <constructor-arg value="MINUTES"/>
+                                    <constructor-arg value="10"/>
                                 </bean>
                             </constructor-arg>
                         </bean>
                     </property>
                     <property name="eagerTtl" value="false"/>
-
                 </bean>
             </list>
         </property>

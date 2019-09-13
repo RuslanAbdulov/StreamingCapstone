@@ -1,16 +1,11 @@
-package stopbot
+package tmp
 
 import org.apache.ignite.spark.IgniteDataFrameSettings
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType, TimestampType}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
-import org.apache.spark.sql.functions.{regexp_extract, _}
-import org.apache.spark.sql.types._
 
-
-//[{"unix_time": 1538076151, "category_id": 1009, "ip": "172.10.2.42", "type": "view"},
-//{"unix_time": 1538076151, "category_id": 1004, "ip": "172.10.1.139", "type": "click"},
-//val regex = "^\\[?(\\{.*\\})[\\,\\]]?$".r
-
-object FraudDetectorSourceFile {
+object FraudDetectorIgniteTableLookUp {
 
   val IGNITE_CONFIG = "ignite-client-config.xml"
 
@@ -25,6 +20,15 @@ object FraudDetectorSourceFile {
     val df = spark
       .readStream
       .text("Data/")
+
+
+    //Define Ignite table
+    val botsIgniteDF = spark.read
+      .format(IgniteDataFrameSettings.FORMAT_IGNITE)
+      .option(IgniteDataFrameSettings.OPTION_TABLE, "bots")
+      .option(IgniteDataFrameSettings.OPTION_CONFIG_FILE, IGNITE_CONFIG)
+      .load()
+    botsIgniteDF.createOrReplaceTempView("bots")
 
 
     import spark.implicits._
@@ -46,7 +50,15 @@ object FraudDetectorSourceFile {
       .select($"struct.*")
       .toDF("unixTime", "categoryId", "ipAddress", "eventType")
 
-    val groupedByIp = events
+
+    //Filter using Ignite table
+    events.createGlobalTempView("events")
+
+    val events2 = events.join(
+      botsIgniteDF.select($"ipAddress".as("cachedIp")), $"ipAddress" === $"cachedIp", "left_anti")
+
+
+    val groupedByIp = events2
       .withWatermark("unixTime", "1 minute") //10 minutes
       .groupBy(
         window($"unixTime", "10 minutes", "5 minutes"),
