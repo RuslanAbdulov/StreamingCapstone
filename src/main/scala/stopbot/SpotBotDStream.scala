@@ -1,5 +1,13 @@
 package stopbot
 
+
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Date
+
+import model.parcer.DateFormatParser
+import org.apache.ignite.IgniteCache
+import org.apache.ignite.spark.IgniteContext
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -15,10 +23,12 @@ object SpotBotDStream {
 
   def main(args: Array[String]) {
 
-    case class EventSchema(unix_time: Long, category_id: Int, ip: String, `type`: String)
+    case class EventSchema(unix_time: LocalDateTime, category_id: Int, ip: String, `type`: String)
+
 
     object MyJsonProtocol extends DefaultJsonProtocol {
-      implicit val colorFormat = jsonFormat4(EventSchema)
+      import DateFormatParser.DateFormat
+      implicit val eventFormat = jsonFormat4(EventSchema)
     }
 
 
@@ -33,6 +43,8 @@ object SpotBotDStream {
       "auto.offset.reset" -> "earliest",
       "enable.auto.commit" -> (false: java.lang.Boolean)
     )
+
+    val igniteContext = new IgniteContext(streamingContext.sparkContext, "ignite-client-config.xml")
 
     val topics = Array("ad-events")
     val stream = KafkaUtils.createDirectStream[String, String](
@@ -50,6 +62,21 @@ object SpotBotDStream {
       .filter(json => json != null)
       .map(json => {
         json.parseJson.convertTo[EventSchema]
+      })
+      .window(Seconds(10), Seconds(5))
+      .transform(rdd => rdd.groupBy(_.ip))
+      .transform(rdd => rdd.map(aggregatedByIpEvent => (aggregatedByIpEvent._2.size > 10, aggregatedByIpEvent._2)))
+      .foreachRDD(rdd =>{
+        rdd.filter(_._1)
+          .map(_._2)
+          .flatMap(_.toStream)
+          .foreach(event =>{
+            val ignite = igniteContext.ignite()
+            val cache: IgniteCache[String, LocalDateTime] = ignite.getOrCreateCache("bots")
+            val result = cache.putIfAbsent(event.ip, event.unix_time)
+            if (result)
+              println(event + " added to cache")
+          })
       })
 
 
