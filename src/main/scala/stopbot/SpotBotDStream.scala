@@ -2,9 +2,8 @@ package stopbot
 
 
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Date
 
+import com.datastax.spark.connector.cql.CassandraConnector
 import model.parcer.DateFormatParser
 import org.apache.ignite.IgniteCache
 import org.apache.ignite.spark.IgniteContext
@@ -27,7 +26,9 @@ object SpotBotDStream {
 
 
     object MyJsonProtocol extends DefaultJsonProtocol {
+
       import DateFormatParser.DateFormat
+
       implicit val eventFormat = jsonFormat4(EventSchema)
     }
 
@@ -45,6 +46,25 @@ object SpotBotDStream {
     )
 
     val igniteContext = new IgniteContext(streamingContext.sparkContext, "ignite-client-config.xml")
+
+    val cassandra = CassandraConnector(streamingContext.sparkContext.getConf)
+    val namespace = "spotbot"
+    val table = "bots"
+    val column_ip = "ip_address"
+    val column_categoryId = "category_id"
+    val column_unixTime = "unix_time"
+    val column_eventType = "event_type"
+    val column_is_bot = "is_bot"
+
+    cassandra.withSessionDo { session =>
+      session.execute(s"drop KEYSPACE IF EXISTS $namespace")
+      session.execute(s"CREATE KEYSPACE IF NOT EXISTS $namespace " +
+        s"WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1 }")
+      session.execute(s"CREATE TABLE IF NOT EXISTS $namespace.$table " +
+        s"(ip_address text, category_id text, unix_time text, event_type text, is_bot text, " +
+        s" PRIMARY KEY (ip_address, category_id, unix_time, event_type))")
+      session.close()
+    }
 
     val topics = Array("ad-events")
     val stream = KafkaUtils.createDirectStream[String, String](
@@ -66,16 +86,29 @@ object SpotBotDStream {
       .window(Seconds(10), Seconds(5))
       .transform(rdd => rdd.groupBy(_.ip))
       .transform(rdd => rdd.map(aggregatedByIpEvent => (aggregatedByIpEvent._2.size > 10, aggregatedByIpEvent._2)))
-      .foreachRDD(rdd =>{
-        rdd.filter(_._1)
+      .foreachRDD(rdd => {
+        rdd
+          .filter(_._1) //write only bots
           .map(_._2)
           .flatMap(_.toStream)
-          .foreach(event =>{
+          .foreach(event => {
             val ignite = igniteContext.ignite()
             val cache: IgniteCache[String, LocalDateTime] = ignite.getOrCreateCache("bots")
             val result = cache.putIfAbsent(event.ip, event.unix_time)
             if (result)
               println(event + " added to cache")
+          })
+
+        rdd
+          .foreach(events => {
+            val session = cassandra.openSession()
+            val isBot = events._1
+            events._2.toStream.foreach(event =>
+              session.execute(
+                s"""insert into $namespace.$table
+              ($column_ip, $column_categoryId, $column_unixTime, $column_eventType, $column_is_bot )
+              values (?, ?, ?, ?, ?)""",
+                event.ip, event.category_id.toString, event.unix_time.toString, event.`type`, isBot.toString))
           })
       })
 
